@@ -1,156 +1,150 @@
-// модуль чтения файлов
+// деструктаризация 
+const { mkdir, readdir, unlink, copyFile, writeFile } = require('fs/promises');
+
+// модули
 const fs = require('fs');
-
-// модуль работы с путями к файлам
 const path = require('path');
-const folder = path.join(__dirname, './styles');
 
-// предоставляет функциональность UNIX команды rm -rf
-const rimraf = require('rimraf');
+// все пути к папкам
+const PATH_TO_DEST = path.join(__dirname, './project-dist');
+const PATH_TO_SOURCE = path.join(__dirname);
+const PATH_TO_COMPONENTS = path.join(__dirname, './components');
+const PATH_TO_STYLES = path.join(__dirname, './styles');
+const PATH_TO_ASSETS = path.join(__dirname, './assets');
+const PATH_TO_DEST_ASSETS = path.join(__dirname, './project-dist', './assets');
+const EXTENSION_TEMPLATE = '.html';
+const EXTENSION_STYLE = '.css';
 
-async function go() {
-  readTemplateFile();
-}
-
-go();
-
-async function readTemplateFile() {
-  fs.readFile(path.join(__dirname, './template.html'), 'utf8', function (error, fileContent) {
-    if (error) throw error;
-    readArticlesFile(fileContent);
-  });
-}
-
-async function readArticlesFile(fileContentMain) {
-  fs.readFile(path.join(__dirname, './components/articles.html'), 'utf8', function (error, fileContent) {
-    if (error) throw error;
-    let res = fileContentMain.replace(/{{articles}}/g, fileContent);
-    readHeaderFile(res);
-  });
-}
-
-async function readHeaderFile(fileContentMain) {
-  fs.readFile(path.join(__dirname, './components/header.html'), 'utf8', function (error, fileContent) {
-    if (error) throw error;
-    let res = fileContentMain.replace(/{{header}}/g, fileContent);
-    readFooterFile(res);
-  });
-}
-
-async function readFooterFile(fileContentMain) {
-  fs.readFile(path.join(__dirname, './components/footer.html'), 'utf8', function (error, fileContent) {
-    if (error) throw error;
-    let res = fileContentMain.replace(/{{footer}}/g, fileContent);
-    createFolder(res);
-  });
-}
-
-async function createFolder(res) {
-  fs.mkdir(path.join(__dirname, './project-dist'), () => {
-    writeFile(res);
-  });
-}
-
-async function writeFile(res) {
-  fs.writeFile(path.join(__dirname, './project-dist/index.html'), res, function () {
-    getStyles();
-  });
-}
-
-async function getStyles() {
-  let data = '';
-  fs.readdir(folder, { withFileTypes: true }, (err, files) => {
-    if (err)
-      console.log(err);
-    else {
-      files.forEach(file => {
-        if ((file.isFile() == true) && (path.parse(file.name).ext == '.css')) {
-          let stream = fs.createReadStream(path.join(__dirname, `./styles/${file.name}`), 'utf-8');
-          stream.on('data', chunk => data += chunk);
-          stream.on('end', () => {
-            fs.writeFile(path.join(__dirname, './project-dist/style.css'), data, function (error) {
-              if (error) throw error;
-            });
-          });
-          stream.on('error', error => console.log('Error', error.message));
-        }
-
-      });
+// создаем файл
+async function createFolder(path) {
+  mkdir(path, { recursive: true }, (error) => {
+    try {
+      if (error) throw error;
     }
-    func();
+    catch (error) {
+      console.log(error);
+    }
   });
 }
 
-async function func() {
-  rimraf(path.join(__dirname, './project-dist/assets'), function () {
-    fs.mkdir(path.join(__dirname, './project-dist/assets'), err => {
-      if (err) throw err;
-      rimraf(path.join(__dirname, './project-dist/assets/fonts'), function () {
-        fs.mkdir(path.join(__dirname, './project-dist/assets/fonts'), err => {
-          if (err) throw err;
-          rimraf(path.join(__dirname, './project-dist/assets/img'), function () {
-            fs.mkdir(path.join(__dirname, './project-dist/assets/img'), err => {
-              if (err) throw err;
-              rimraf(path.join(__dirname, './project-dist/assets/svg'), function () {
-                fs.mkdir(path.join(__dirname, './project-dist/assets/svg'), err => {
-                  if (err) throw err;
-                  copyImg();
-                  copySvg();
-                  copyFonts();
-                });
-              });
-            });
-          });
+// удаляем файл
+async function deleteFiles(path) {
+  const arr = await readdir(path, { encoding: 'utf-8', withFileTypes: true });
+  if (arr.length !== 0) {
+    arr.forEach((file) => {
+      if (file.isFile()) {
+        unlink(`${path}/${file.name}`, error => {
+          try {
+            if (error) throw error;
+          }
+          catch (error) {
+            console.log(error);
+          }
         });
-      });
+      } else {
+        deleteFiles(path + '/' + file.name);
+      }
     });
-  });
+  }
 }
 
-async function copyImg() {
-  fs.readdir(path.join(__dirname, './assets/img'), { withFileTypes: true }, (err, files) => {
-    if (err)
-      console.log(err);
-    else {
-      files.forEach(file => {
-        if (file.isFile()) {
-          fs.copyFile(path.join(__dirname, `./assets/img/${file.name}`), path.join(__dirname, `./project-dist/assets/img/${file.name}`), err => {
-            if (err) throw err;
-          });
-        }
-      });
+// читаем файл асинхронно
+const readFileAsync = async (path) => {
+  return new Promise((resolve, reject) => fs.readFile(path, { encoding: 'utf-8' }, (err, data) => {
+    if (err) {
+      return reject(err.message);
     }
-  });
-}
+    resolve(data);
+  }));
+};
 
-async function copySvg() {
-  fs.readdir(path.join(__dirname, './assets/svg'), { withFileTypes: true }, (err, files) => {
-    if (err)
-      console.log(err);
-    else {
-      files.forEach(file => {
-        if (file.isFile()) {
-          fs.copyFile(path.join(__dirname, `./assets/svg/${file.name}`), path.join(__dirname, `./project-dist/assets/svg/${file.name}`), err => {
-            if (err) throw err;
-          });
-        }
-      });
+// записываем в файл асинхронно
+const writeFileAsync = async (path, data) => {
+  return new Promise((resolve, reject) => writeFile(path, data, (err) => {
+    if (err) {
+      return reject(err.message);
     }
-  });
-}
+    resolve();
+  }));
+};
 
-async function copyFonts() {
-  fs.readdir(path.join(__dirname, './assets/fonts'), { withFileTypes: true }, (err, files) => {
-    if (err)
-      console.log(err);
-    else {
-      files.forEach(file => {
-        if (file.isFile()) {
-          fs.copyFile(path.join(__dirname, `./assets/fonts/${file.name}`), path.join(__dirname, `./project-dist/assets/fonts/${file.name}`), err => {
-            if (err) throw err;
-          });
+// открываем файл для записи
+const openFileForWriting = (file) => {
+  fs.open(file, 'w', (error) => {
+    if (error) throw error;
+  });
+};
+
+// копируем файл
+const copyFiles = async (files, name) => {
+  if (Array.isArray(files)) {
+    files.forEach((file) => copyFile(`${PATH_TO_ASSETS}/${name}/${file.name}`, `${PATH_TO_DEST_ASSETS}/${name}/${file.name}`, 0, (error) => {
+      try {
+        if (error) throw error;
+      }
+      catch (error) {
+        console.log(error);
+      }
+    }));
+  } else {
+    copyFile(`${PATH_TO_ASSETS}/${files}`, `${PATH_TO_DEST_ASSETS}/${files}`, 0, (error) => {
+      try {
+        if (error) throw error;
+      }
+      catch (error) {
+        console.log(error);
+      }
+    });
+  }
+};
+
+// IFFI
+(async function bundleWeb() {
+  await createFolder(PATH_TO_DEST);
+  await deleteFiles(PATH_TO_DEST);
+  const bundleHTML = path.join(__dirname, './project-dist', 'index.html');
+  const bundleCSS = path.join(__dirname, './project-dist', 'style.css');
+  await createFolder(PATH_TO_DEST_ASSETS);
+
+  const files = await readdir(PATH_TO_SOURCE, { encoding: 'utf-8', withFileTypes: true });
+  for (const file of files) {
+    if (file.isFile() && path.extname(file.name) === EXTENSION_TEMPLATE) {
+      openFileForWriting(bundleHTML);
+      const templateStream = fs.createReadStream(path.join(__dirname, file.name), 'utf-8');
+      let data = '';
+      templateStream.on('data', chunk => data += chunk);
+      templateStream.on('end', () => {
+        const arrRegEx = data.match(/\{{([^}]+)\}}/g);
+        for (const item of arrRegEx) {
+          readFileAsync(`${PATH_TO_COMPONENTS}/${item.slice(2, -2)}${EXTENSION_TEMPLATE}`)
+            .then((result) => data = data.replace(item, result))
+            .then((data) => writeFileAsync(bundleHTML, data))
+            .catch(error => console.log(error));
         }
       });
+    } else if (file.isDirectory() && file.name === 'styles') {
+      const filesCSS = await readdir(PATH_TO_STYLES, { encoding: 'utf-8', withFileTypes: true });
+      openFileForWriting(bundleCSS);
+      const resultCSSArr = [];
+      for (const fileCSS of filesCSS) {
+        if (fileCSS.isFile() && path.extname(fileCSS.name) === EXTENSION_STYLE) {
+          readFileAsync(`${PATH_TO_STYLES}/${fileCSS.name}`)
+            .then(data => { resultCSSArr.push(data); })
+            .then(() => writeFileAsync(bundleCSS, resultCSSArr.join('\n')))
+            .catch((err) => console.log(err));
+        }
+      }
+    } else if (file.isDirectory() && file.name === 'assets') {
+      const filesAssets = await readdir(PATH_TO_ASSETS, { encoding: 'utf-8', withFileTypes: true });
+      for (let asset of filesAssets) {
+        if (asset.isDirectory()) {
+          await createFolder(path.join(__dirname, './project-dist', './assets', asset.name));
+          const files = await readdir(path.join(__dirname, './assets', asset.name), { encoding: 'utf-8', withFileTypes: true });
+          copyFiles(files, asset.name);
+        } else {
+          copyFiles(asset.name);
+        }
+      }
     }
-  });
-}
+  }
+})();

@@ -4,40 +4,42 @@ const fs = require('fs');
 // модуль работы с путями к файлам
 const path = require('path');
 
-// старый и новый файлы
-const oldPath = path.join(__dirname, 'files');
-const newPath = path.join(__dirname, 'files-copy');
+async function go() {
+  fs.stat(path.join(__dirname, './files-copy'), function (err) {
+    if (!err) {
+      fs.readdir(path.join(__dirname, './files-copy'), (err, files) => {
+        if (err) throw err;
+        for (const file of files) {
+          fs.unlink(path.join(path.join(__dirname, './files-copy'), file), err => {
+            if (err) throw err;
+          });
+        }
+      });
+      copyFiles();
+    }
+    else if (err.code === 'ENOENT') {
+      fs.mkdir(path.join(__dirname, './files-copy'), err => {
+        if (err) throw err;
+        copyFiles();
+      });
+    }
+  });
+}
 
-// асинхронно создаем каталог
-fs.mkdir(newPath, {
-  recursive: true,
-}, (error) => {
+async function copyFiles() {
+  fs.readdir(path.join(__dirname, './files'), { withFileTypes: true }, (err, files) => {
+    if (err)
+      console.log(err);
+    else {
+      files.forEach(file => {
+        if (file.isFile()) {
+          fs.copyFile(path.join(__dirname, `./files/${file.name}`), path.join(__dirname, `./files-copy/${file.name}`), err => {
+            if (err) throw err;
+          });
+        }
+      });
+    }
+  });
+}
 
-  if (error) throw error;
-});
-
-// читаем содержимое нового каталога
-fs.readdir(newPath, (error, files) => {
-
-  for (let i = 0; i < files.length; i++) {
-
-    // принимает имя файла, который нужно удалить
-    fs.unlink(newPath + '/' + files[i], error => {
-      if (error) throw error;
-    });
-  }
-});
-
-// читаем содержимое старого каталога
-fs.readdir(oldPath, (error, files) => {
-
-  if (error) throw error;
-
-  for (let i = 0; i < files.length; i++) {
-
-    // асинхронно копирует 'src' к 'dest'
-    fs.copyFile(oldPath + '/' + files[i], newPath + '/' + files[i], (error) => {
-      if (error) throw error;
-    });
-  }
-});
+go();
